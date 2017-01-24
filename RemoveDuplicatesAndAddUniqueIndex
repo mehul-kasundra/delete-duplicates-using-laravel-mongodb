@@ -9,121 +9,67 @@ use Illuminate\Database\Migrations\Migration;
 
 class RemoveDuplicatesAndAddUniqueIndex extends Migration
 {
-
 	/**
-
-	* Run the migrations.
-
-	*
-
-	* @return void
-
-	*/
-
+	  * Run the migrations.
+	  *
+          * @return void
+        */
 	public function up()
 	{
-
 		$dbName = env('MONGO_DB_DATABASE', 'forge');
-
 		$db = $this->getMongoConection();
 
 		if( $db && $this->orderCollectionExists($dbName, $db) ){
-
 			$newCollection = $db->createCollection('new_orders');
-
 			$newCollection->createIndex(
-
-			array(
-
-			'AmazonOrderId' => 1,
-
-			'SellerAccountId' => 1
-
-			),
-
-			array('unique' => true)
+  				array('AmazonOrderId' => 1, 'SellerAccountId' => 1),
+  				array('unique' => true)
 
 			);
 
 			$result = $db->command(array(
-
 				"eval" => new MongoCode("function(){ " .
-
-				"db.orders.find().forEach(function(doc) { " .
-
-				"db.new_orders.insert(doc); " .
-
-				"}); " .
-
-				"};")
-
+				"db.orders.find().forEach(function(doc) { " . "db.new_orders.insert(doc); " . "}); " . "};")
 			));
 
 			if ($result['ok']==1){
-
 				$db->command(
-
-					array(
-						'renameCollection' => $dbName.'.orders',
-
-						'to' => $dbName.'.old_orders'
-
-					)
-
+					array('renameCollection' => $dbName.'.orders', 'to' => $dbName.'.old_orders')
 				);
 
 				$db->command(
-
-					array(
-
-						'renameCollection' => $dbName.'.new_orders',
-
-						'to' => $dbName.'.orders'
-
-					)
-
+					array('renameCollection' => $dbName.'.new_orders', 'to' => $dbName.'.orders')
 				);
-
 			}
 
 		} else{
-
 			\Log::error('RemoveDuplicatesAndAddUniqueIndex migration was aborted');
-
 		}
 
 	}
 
-	/**
-
+      /**
 	* Reverse the migrations.
-
 	*
-
 	* @return void
-
 	*/
 
 	public function down()
 
 	{
 
-	//
+		//
 
 	}
 
 	private function getMongoConection(){
 
 		try {
-
 			$connection = \DB::connection('mongodb');
-
 			return $connection->getMongoDB();
-
 		}
 
 		catch(\Exception $e){
-
 			\Log::error('Mongo connection::get '. $e->getMessage());
 		}
 	}
