@@ -1,0 +1,141 @@
+This following code represents migration, which deletes the dublicates in MOngo DB. 
+
+4. ????? ???? ?????? ???????????? ? ???????? , ??? ??????? ?????? ??? Mongo ???????? ????
+
+?????????????:
+
+&lt;?php
+
+use Illuminate\Database\Schema\Blueprint;
+
+use Illuminate\Database\Migrations\Migration;
+
+class RemoveDuplicatesAndAddUniqueIndex extends Migration
+
+{
+
+/**
+
+* Run the migrations.
+
+*
+
+* @return void
+
+*/
+
+public function up()
+
+{
+
+$dbName = env(&#39;MONGO_DB_DATABASE&#39;, &#39;forge&#39;);
+
+$db = $this-&gt;getMongoConection();
+
+if( $db &amp;&amp; $this-&gt;orderCollectionExists($dbName, $db) ){
+
+$newCollection = $db-&gt;createCollection(&#39;new_orders&#39;);
+
+$newCollection-&gt;createIndex(
+
+array(
+
+&#39;AmazonOrderId&#39; =&gt; 1,
+
+&#39;SellerAccountId&#39; =&gt; 1
+
+),
+
+array(
+
+&#39;unique&#39; =&gt; true
+
+)
+
+);
+
+$result = $db-&gt;command(array(
+
+&quot;eval&quot; =&gt; new MongoCode(&quot;function(){ &quot; .
+
+&quot;db.orders.find().forEach(function(doc) { &quot; .
+
+&quot;db.new_orders.insert(doc); &quot; .
+
+&quot;}); &quot; .
+
+&quot;};&quot;
+
+)
+
+));
+
+if ($result[&#39;ok&#39;]==1){
+
+$db-&gt;command(
+
+array(
+
+&#39;renameCollection&#39; =&gt; $dbName.&#39;.orders&#39;,
+
+&#39;to&#39; =&gt; $dbName.&#39;.old_orders&#39;
+
+)
+
+);
+
+$db-&gt;command(
+
+array(
+
+&#39;renameCollection&#39; =&gt; $dbName.&#39;.new_orders&#39;,
+
+&#39;to&#39; =&gt; $dbName.&#39;.orders&#39;
+
+)
+
+);
+
+}
+
+}
+
+else{
+
+\Log::error(&#39;RemoveDuplicatesAndAddUniqueIndex migration was aborted&#39;);
+
+}
+
+}
+
+/**
+
+* Reverse the migrations.
+
+*
+
+* @return void
+
+*/
+
+public function down()
+
+{
+
+//
+
+}
+
+private function getMongoConection(){
+
+try {
+
+$connection = \DB::connection(&#39;mongodb&#39;);
+
+return $connection-&gt;getMongoDB();
+
+}
+
+catch(\Exception $e){
+
+\Log::error(&#39;Mongo connection::get &#39;. $e-&gt;getMessage());
